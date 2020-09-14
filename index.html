@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-		<title>reveal.js</title>
+		<title>Web of Things in RIOT OS</title>
 
 		<link rel="stylesheet" href="dist/reset.css">
 		<link rel="stylesheet" href="dist/reveal.css">
@@ -16,8 +16,229 @@
 	<body>
 		<div class="reveal">
 			<div class="slides">
-				<section>Slide 1</section>
-				<section>Slide 2</section>
+				<section data-background-color="#8bd7d3">
+					<h1>Web of things</h1>
+					<p>The missing piece for interoperability</p>
+					<p style="font-size: 24px">Philipp Blum</p>
+					<div style="display: inline-block; width: 40%;">
+						<div style="float: left; width: 60%;">
+							<img src="img/github.png" style="height: 64px;">
+							<img src="img/174876.png" style="height: 64px;">
+							<img src="img/stackoverflow.png" style="height: 64px;">
+						</div>
+						<div style="float: left; width: 40%; margin-top: 25px;">Citrullin</div>
+					</div>
+				</section>
+				<section>
+					<h2>What is WoT (Web of Things)?</h2>
+					<p>A set of standards to make interoperability in IoT possible. Like the World Wide Web, but for IoT devices.</p>
+				</section>
+				<section>
+					<h1>Web of Things: Architecture</h1>
+				</section>
+				<section data-background-color="#8bd7d3">
+					<img src="img/architecture-overview-large.png">
+				</section>
+				<section>
+					<h2>RIOT OS & Web of Things</h2>
+					<p>It's all about Things Description (TD)</p>
+					<img src="img/td.png" style="height: 450px;">
+				</section>
+				<section data-markdown data-background-color="#8bd7d3">
+					(Pseudocode)
+					```json
+					{
+						"@context": "https://www.w3.org/2019/wot/td/v1",
+						"id": "urn:dev:ops:32473-WoTLamp-1234",
+						"title": "MyLampThing",
+						"securityDefinitions": {
+							"basic_sc": {"scheme": "basic", "in":"header"}
+						},
+						"security": ["basic_sc"],
+						"properties": {
+							"status" : {
+								"type": "string",
+								"forms": [{"href": "https://mylamp.example.com/status"}]
+							}
+						},
+						"actions": {
+							"toggle" : {
+								"forms": [{"href": "https://mylamp.example.com/toggle"}]
+							}
+						},
+						"events":{
+							"overheating":{
+								"data": {"type": "string"},
+								"forms": [{
+									"href": "https://mylamp.example.com/oh",
+									"subprotocol": "longpoll"
+								}]
+							}
+						}
+					}
+					```
+				</section>
+				<section>
+					<h1>WoT Scripting API</h1>
+					<p>A standard API to interact with Things</p>
+				</section>
+				<section data-markdown data-background-color="#8bd7d3">
+					(Pseudocode)
+					```javascript
+					fetch("https://tds.mythings.org/sensor11")
+						.then(res => new ConsumedThing(res.json()))
+						.then(thing => {
+
+							thing
+								.subscribeProperty(
+									"temperature",
+									value => { console.log("Temperature changed to: "+ value);  }
+								);
+
+							thing
+								.subscribeEvent(
+									"ready",
+									eventData => { console.log("Ready; index: "+ eventData }
+								);
+
+							thing
+								.invokeAction(
+									"startMeasurement",
+									{ units:"Celsius" }
+								);
+
+							console.log("Measurement started.");
+					     });
+					```
+				</section>
+				<section>
+					<h1>WoT Binding Templates</h1>
+					<p>"Binding Templates enable a Thing Description to be adapted to the
+						specific protocol or data payload usage across the different standards."</p>
+				</section>
+				<section data-background-color="#8bd7d3">
+					<p>Binding can be defined in the context of a TD</p>
+					<p>(Pseudocode, invalid)</p>
+					<div data-markdown>
+						```json
+						{
+							"@context": [
+								"https://www.w3.org/2019/wot/td/v1",
+								{
+									"cov": "http://www.example.org/coap-binding#"
+								}
+							],
+							"id": "urn:dev:ops:32473-WoTLamp-1234",
+							"title": "MyLampThing"
+						}
+						```
+					</div>
+				</section>
+				<section data-background-color="#8bd7d3">
+					<p>And use it in an Interaction Affordance</p>
+					<p>(Pseudocode, invalid)</p>
+					<div data-markdown>
+						```json
+						{
+							"actions": {
+								"toggle": {
+								"description" : "Turn on or off the lamp",
+								"forms": [{
+										"href": "coaps://mylamp.example.com/toggle",
+										"cov:methodName" : "POST"
+									}]
+								}
+							}
+						}
+						```
+					</div>
+				</section>
+				<section>
+					<h1>Integration into RIOT OS</h1>
+					<p>
+						Modules: wot and wot_coap
+					</p>
+				</section>
+				<section data-background-color="#8bd7d3">
+					<h3>Module: wot</h3>
+					<p>Structure and API to manipulate it</p>
+					<div data-markdown>
+						```c
+						typedef struct {
+							json_ld_context_t *context;
+							wot_td_type_t *type;
+							wot_td_uri_t *id;
+							wot_td_multi_lang_t *titles;
+							wot_td_multi_lang_t *descriptions;
+							wot_td_version_info_t *version;
+							wot_td_date_time_t *created;
+							wot_td_date_time_t *modified;
+							wot_td_uri_t *support;
+							wot_td_uri_t *base;
+							wot_td_prop_affordance_t *properties;
+							wot_td_action_affordance_t *actions;
+							wot_td_event_affordance_t *events;
+							wot_td_link_t *links;
+							wot_td_form_t *forms;
+							wot_td_security_t *security;
+							char *default_language_tag;
+						} wot_td_thing_t;
+
+						int wot_td_thing_context_add(wot_td_thing_t *thing, json_ld_context_t *context);
+						int wot_td_thing_context_rm(wot_td_thing_t *thing, json_ld_context_t *context);
+						json_ld_context_t * wot_td_thing_context_find_nth(wot_td_thing_t *thing, uint8_t pos);
+						json_ld_context_t * wot_td_thing_context_find_key(wot_td_thing_t *thing, char *key);
+						json_ld_context_t * wot_td_thing_context_find_value(wot_td_thing_t *thing, char *value);
+
+						int wot_td_thing_prop_add(wot_td_thing_t *thing, wot_td_prop_affordance_t *property);
+						int wot_td_thing_prop_rm(wot_td_thing_t *thing, wot_td_prop_affordance_t *property);
+						wot_td_prop_affordance_t * wot_td_thing_prop_find_nth(wot_td_thing_t *thing, uint8_t pos);
+						wot_td_prop_affordance_t * wot_td_thing_prop_find_key(wot_td_thing_t *thing, char *key);
+						```
+					</div>
+				</section>
+				<section data-background-color="#8bd7d3">
+					<h3>Module: wot_coap</h3>
+					<p>WoT API on top of nanocoap</p>
+					<div data-markdown>
+						```c
+						typedef struct {
+							coap_resource_t *coap_resource;
+							wot_td_prop_affordance_t *affordance;
+						} wot_td_coap_prop_affordance_t;
+
+						typedef struct {
+							coap_resource_t *coap_resource;
+							wot_td_action_affordance_t *affordance;
+						} wot_td_coap_action_affordance_t;
+
+						typedef struct {
+							coap_resource_t *coap_resource;
+							wot_td_event_affordance_t *affordance;
+						} wot_td_coap_event_affordance_t;
+
+						int wot_td_coap_prop_add(wot_td_thing_t *thing, wot_td_coap_prop_affordance_t *property);
+						int wot_td_coap_action_add(wot_td_thing_t *thing, wot_td_action_affordance_t *action);
+						int wot_td_coap_event_add(wot_td_thing_t *thing, wot_td_coap_event_affordance_t *event);
+						```
+					</div>
+				</section>
+				<section>
+					<h3>Features for the future:</h3>
+					<ul>
+						<li>WoT persistence: Module to cache the TD on a persistent storage.</li>
+						<li>WoT SAUL/eSAUL: Module to generate a TD from SAUL/eSAUL</li>
+					</ul>
+				</section>
+				<section>
+					<h3>Want to support?</h3>
+					<p><a href="https://github.com/RIOT-OS/RIOT/issues/14095">"Tracker: WoT Thing Description"</a>
+						on Github</p>
+					<p>Financial contributions are welcomed to focus on the development.</p>
+				</section>
+				<section>
+					<h2>Questions?</h2>
+				</section>
 			</div>
 		</div>
 
